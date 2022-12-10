@@ -4,12 +4,29 @@ Basic Intro
 
 https://lia.epfl.ch/wp-content/uploads/project_proposals/proposal_498.pdf
 
-
 Steps:
 
 1. Run BERT on COPA, finetuning
 2. Propose new prompts
+3. Generation tasks with/without prompts
 ......
+
+## Finetuning on Classification Task
+
+```shell
+sh copa_classification.sh
+```
+
+We compare `bert-base-uncased`, `roberta-base`, and `xlm-roberta-base`.
+
+Result (bad):
+
+|           | BERT-base-uncased | RoBERTa-base | XLMRoBERTa-base |
+| --------- | ----------------- | ------------ | --------------- |
+| Accuracy  |          $0.00\pm0.00$         |       $0.00\pm0.00$       |        $0.00\pm0.00$         |
+| Precision |           $0.00\pm0.00$        |        $0.00\pm0.00$      |         $0.00\pm0.00$        |
+| Recall    |            $0.00\pm0.00$       |         $0.00\pm0.00$     |         $0.00\pm0.00$        |
+| F1-score  |          $0.00\pm0.00$         |        $0.00\pm0.00$      |          $0.00\pm0.00$       |
 
 Existing code:
 
