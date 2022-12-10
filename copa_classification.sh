@@ -1,6 +1,6 @@
 python copa_classification.py       \
-    --model bert    \
-    --output_dir results_bert   \
+    --model roberta    \
+    --output_dir results_roberta   \
     --batch_size=32 \
     --learning_rate=5e-5    \
     --epochs=50     \

@@ -204,10 +204,10 @@ def main():
 
         # compute accuracy, precision, recall, and f1
         # run multiple times of training and calculate the mean and standard error later
-        a.append(accuracy.compute(predictions = predictions.argmax(axis=1), references = labels))
-        p.append(precision.compute(predictions = predictions.argmax(axis=1), references = labels))
-        r.append(recall.compute(predictions = predictions.argmax(axis=1), references = labels))
-        f.append(f1.compute(predictions = predictions.argmax(axis=1), references = labels))
+        a.append(accuracy.compute(predictions = predictions.argmax(axis=1), references = labels)["accuracy"])
+        p.append(precision.compute(predictions = predictions.argmax(axis=1), references = labels, average="macro")["precision"])
+        r.append(recall.compute(predictions = predictions.argmax(axis=1), references = labels, average="macro")["recall"])
+        f.append(f1.compute(predictions = predictions.argmax(axis=1), references = labels, average="macro")["f1"])
     
     print(np.array(a).mean(), np.array(a).std())
     print(np.array(p).mean(), np.array(p).std())
