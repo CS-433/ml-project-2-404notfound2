@@ -9,7 +9,7 @@
 """
 
 """
-The core codes of this file i.e., the classes ModelArguments, Seq2SeqTrainer (Trainer API), Seq2SeqTrainingArguments are from https://huggingface.co/docs/transformers/tasks/multiple_choice
+The core codes of this file i.e., preprocess_function, compute_metrics, DataCollatorForMultipleChoice are from https://huggingface.co/docs/transformers/tasks/multiple_choice
 """
 
 import os
@@ -23,8 +23,8 @@ from typing import Optional, Union
 from datasets import load_dataset, load_metric
 from transformers import TrainingArguments, Trainer
 from transformers.trainer_callback import PrinterCallback
-from transformers import AutoTokenizer, RobertaTokenizer, XLMRobertaTokenizer
-from transformers import AutoModelForMultipleChoice, RobertaForMultipleChoice, XLMRobertaForMultipleChoice
+from transformers import AutoTokenizer, RobertaTokenizer, XLMRobertaTokenizer, AlbertTokenizer
+from transformers import AutoModelForMultipleChoice, RobertaForMultipleChoice, XLMRobertaForMultipleChoice, AlbertForMultipleChoice
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase, PaddingStrategy
 
 
@@ -43,7 +43,6 @@ def preprocess_function(examples, tokenizer):
     """
 
     question_headers = examples[QUESTION_COL]
-    first_sentences = [[context]*2 for context in examples[CONTEXT_COL]]
     first_sentences = [
         [f"{examples[CONTEXT_COL][i]} What was the CAUSE of this?"]*2 if header == "cause" else\
         [f"{examples[CONTEXT_COL][i]} What was the EFFECT of this?"]*2\
@@ -101,7 +100,7 @@ class DataCollatorForMultipleChoice:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="bert", help="Model choice: bert, roberta, xlmroberta")
+    parser.add_argument("--model", type=str, default="bert", help="Model choice: bert, roberta, xlmroberta, or albert")
     parser.add_argument("--output_dir", type=str, default="outputs", help="Model output directory")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("--learning_rate", type=float, default=5e-5, help="Learning rate")
@@ -133,6 +132,9 @@ def main():
         elif args.model == "xlmroberta":
             tokenizer = XLMRobertaTokenizer.from_pretrained("xlm-roberta-base")
             model = XLMRobertaForMultipleChoice.from_pretrained("xlm-roberta-base")
+        elif args.model == "albert":
+            tokenizer = AlbertTokenizer.from_pretrained("albert-large-v2")
+            model = AlbertForMultipleChoice.from_pretrained("albert-large-v2")
         else:
             print("Model Not Supported")
             raise ModuleNotFoundError
