@@ -2,6 +2,7 @@ COPA-resources/
 results*/
 wandb
 .vscode/
+*.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
