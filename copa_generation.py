@@ -27,10 +27,10 @@ from datasets import load_dataset, load_metric
 
 from transformers import pipeline
 from transformers import TrainingArguments, Trainer
-from transformers import DataCollatorForLanguageModeling
+from transformers import DataCollatorForLanguageModeling, DataCollatorForSeq2Seq
 from transformers.trainer_callback import PrinterCallback
 from transformers import BertTokenizer, RobertaTokenizer, XLMRobertaTokenizer, BartTokenizer
-from transformers import BertLMHeadModel, RobertaForCausalLM, XLMRobertaForCausalLM, BartForCausalLM
+from transformers import BertLMHeadModel, RobertaForCausalLM, XLMRobertaForCausalLM, BartForConditionalGeneration
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase, PaddingStrategy
 
 
@@ -41,7 +41,7 @@ ANSWER_2_COL = "choice2"
 LABEL_COL = "label"
 
 
-def preprocess_function(examples, tokenizer):
+def preprocess_for_lm(examples, tokenizer):
     question_headers = examples[QUESTION_COL]
     first_sentences = [
         f"{examples[CONTEXT_COL][i]} What was the CAUSE of this?" if header == "cause" else\
@@ -64,6 +64,35 @@ def preprocess_function(examples, tokenizer):
     output["labels"] = output["input_ids"].copy()
 
     return output
+
+
+def preprocess_for_seq2seq(examples, tokenizer):
+    question_headers = examples[QUESTION_COL]
+    first_sentences = [
+        f"{examples[CONTEXT_COL][i]} What was the CAUSE of this?" if header == "cause" else\
+        f"{examples[CONTEXT_COL][i]} What was the EFFECT of this?"\
+            for i, header in enumerate(question_headers)
+    ]
+    labels = examples[LABEL_COL]
+    
+    second_sentences = [
+        f"{examples[ANSWER_1_COL][i]}" if label == 0 else\
+        f"{examples[ANSWER_2_COL][i]}"\
+            for i, label in enumerate(labels)
+    ]
+
+    model_inputs = tokenizer(first_sentences, max_length=128, truncation=True)
+    with tokenizer.as_target_tokenizer():
+        labels = tokenizer(second_sentences, max_length=32, truncation=True)
+
+    # If we are padding here, replace all tokenizer.pad_token_id in the labels by -100 when we want to ignore
+    # padding in the loss.
+    labels["input_ids"] = [
+        [(l if l != tokenizer.pad_token_id else -100) for l in label] for label in labels["input_ids"]
+    ]
+
+    model_inputs["labels"] = labels["input_ids"]
+    return model_inputs
 
 
 def compute_metrics(predictions, references, results={}):
@@ -126,7 +155,7 @@ def main():
     elif args.model == "bart":
         tokenizer = BartTokenizer.from_pretrained("facebook/bart-base")
         tokenizer.pad_token = tokenizer.eos_token
-        model = BartForCausalLM.from_pretrained("facebook/bart-base")
+        model = BartForConditionalGeneration.from_pretrained('facebook/bart-base')
     else:
         print("Model Not Supported")
         raise ModuleNotFoundError
@@ -135,11 +164,20 @@ def main():
     copa = load_dataset("super_glue", "copa")
 
     # Data preprocessing
-    tokenized_copa = copa.map(
-        lambda f: preprocess_function(f, tokenizer),
-        batched=True,
-        remove_columns=copa["train"].column_names
-    )
+    if args.model == "bart":
+        tokenized_copa = copa.map(
+            lambda f: preprocess_for_seq2seq(f, tokenizer),
+            batched=True,
+            remove_columns=copa["train"].column_names
+        )
+        data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
+    else:
+        tokenized_copa = copa.map(
+            lambda f: preprocess_for_lm(f, tokenizer),
+            batched=True,
+            remove_columns=copa["train"].column_names
+        )
+        data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
     train_dataset = tokenized_copa["train"]
     val_dataset = tokenized_copa["validation"]
     test_dataset = tokenized_copa["test"]
@@ -177,12 +215,12 @@ def main():
         )
 
     # Train the model
-    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
+        tokenizer=tokenizer,
         data_collator=data_collator,
     )
     trainer.remove_callback(PrinterCallback)
@@ -195,34 +233,36 @@ def main():
     for idx, example in tqdm(enumerate(copa["validation"])):
         example = copa["validation"][idx]
         if example["question"] == "cause":
-            prompt = f"{example[CONTEXT_COL]} What was the cause of this?"
+            prompt = f"{example[CONTEXT_COL]} What was the CAUSE of this?"
         elif example["question"] == "effect":
-            prompt = f"{example[CONTEXT_COL]} What was the effect of this?"
+            prompt = f"{example[CONTEXT_COL]} What was the EFFECT of this?"
         label = example[LABEL_COL]
         truth = example[ANSWER_1_COL] if label == 0 else example[ANSWER_2_COL]
-        generator = pipeline("text-generation", tokenizer=tokenizer, model=model)
         inputs = tokenizer(prompt, return_tensors="pt").input_ids.to("cuda")
-        outputs = model.generate(inputs, max_new_tokens=100, do_sample=True, top_k=50, top_p=0.95)
-        answer = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0][len(prompt)+1:]
-        pos_e = answer.find(".")
-        pos_s = answer.find("?")
-        if args.model == "bert":
-            pass
-        elif args.model == "roberta" or args.model == "xlmroberta":
-            answer = answer[pos_s+1:pos_e+1]
-        else:
+        if args.model == "bart":
+            outputs = model.generate(inputs, max_new_tokens=100, do_sample=True)
+            answer = tokenizer.decode(outputs[0], skip_special_tokens=True)
+            pos_e = answer.find(".")
             answer = answer[:pos_e+1]
-        # answer = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+        else:
+            outputs = model.generate(inputs, max_new_tokens=100, do_sample=True, top_k=50, top_p=0.95)
+            answer = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0][len(prompt)+1:]
+            pos_e = answer.find(".")
+            pos_s = answer.find("?")
+            if args.model == "bert":
+                pass
+            elif args.model == "roberta" or args.model == "xlmroberta":
+                answer = answer[pos_s+1:pos_e+1]
+            else:
+                answer = answer[:pos_e+1]
 
         predictions.append(answer)
         references.append([truth])
-    print(predictions)
 
     # compute metrics
     results = {}
     results["preplexity"] = math.exp(trainer.evaluate()["eval_loss"])
     results = compute_metrics(predictions, references, results)
-    print(results)
 
     # Predicting test dataset (no label)
     if args.do_test:
@@ -233,16 +273,20 @@ def main():
             elif example["question"] == "effect":
                 prompt = f"{examples[CONTEXT_COL]} What was the EFFECT of this?"
             inputs = tokenizer(prompt, return_tensors="pt").input_ids.to("cuda")
-            outputs = model.generate(inputs, max_new_tokens=35, do_sample=True, top_k=50, top_p=0.95)
-            answer = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0][len(prompt)+1:]
-            pos_e = answer.find(".")
-            pos_s = answer.find("?")
-            if args.model == "bert":
-                pass
-            elif args.model == "roberta" or args.model == "xlmroberta":
-                answer = answer[pos_s+1:pos_e+1]
+            if args.model == "bart":
+                outputs = model.generate(inputs, max_new_tokens=100, do_sample=True)
+                answer = tokenizer.decode(outputs[0], skip_special_tokens=True)
             else:
-                answer = answer[:pos_e+1]
+                outputs = model.generate(inputs, max_new_tokens=100, do_sample=True, top_k=50, top_p=0.95)
+                answer = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0][len(prompt)+1:]
+                pos_e = answer.find(".")
+                pos_s = answer.find("?")
+                if args.model == "bert":
+                    pass
+                elif args.model == "roberta" or args.model == "xlmroberta":
+                    answer = answer[pos_s+1:pos_e+1]
+                else:
+                    answer = answer[:pos_e+1]
             predictions.append(answer)
 
         output_predict_file = os.path.join("./", args.predict_dir)
