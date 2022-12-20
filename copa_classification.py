@@ -18,6 +18,7 @@ import torch
 import argparse
 import evaluate
 import numpy as np
+from random import randint
 from dataclasses import dataclass
 from typing import Optional, Union
 from datasets import load_dataset, load_metric
@@ -135,6 +136,8 @@ def main():
         elif args.model == "albert":
             tokenizer = AlbertTokenizer.from_pretrained("albert-large-v2")
             model = AlbertForMultipleChoice.from_pretrained("albert-large-v2")
+        elif args.model == "random":
+            pass
         else:
             print("Model Not Supported")
             raise ModuleNotFoundError
@@ -142,17 +145,37 @@ def main():
         # Load COPA dataset
         copa = load_dataset("super_glue", "copa")
 
-        # Data preprocessing
-        tokenized_copa = copa.map(lambda f: preprocess_function(f, tokenizer), batched=True)
-        train_dataset = tokenized_copa["train"]
-        val_dataset = tokenized_copa["validation"]
-        test_dataset = tokenized_copa["test"]
-
         # Load evaluation metrics
         accuracy = evaluate.load("accuracy")
         precision = evaluate.load("precision")
         recall = evaluate.load("recall")
         f1 = evaluate.load("f1")
+
+        # compute random guess performance
+        if args.model == "random":
+            y_true = copa["validation"]["label"]
+            a, p, r, f = [], [], [], []
+
+            for run_time in range(args.run_time):
+                y_pred = [randint(0, 1) for i in range(len(y_true))]
+
+                a.append(accuracy.compute(predictions = y_pred, references = y_true)["accuracy"])
+                p.append(precision.compute(predictions = y_pred, references = y_true, average="macro")["precision"])
+                r.append(recall.compute(predictions = y_pred, references = y_true, average="macro")["recall"])
+                f.append(f1.compute(predictions = y_pred, references = y_true, average="macro")["f1"])
+
+            print(np.array(a).mean(), np.array(a).std())
+            print(np.array(p).mean(), np.array(p).std())
+            print(np.array(r).mean(), np.array(r).std())
+            print(np.array(f).mean(), np.array(f).std())
+
+            exit(0)
+
+        # Data preprocessing
+        tokenized_copa = copa.map(lambda f: preprocess_function(f, tokenizer), batched=True)
+        train_dataset = tokenized_copa["train"]
+        val_dataset = tokenized_copa["validation"]
+        test_dataset = tokenized_copa["test"]
 
         # Load training arguments
         if args.wandb_logging:
