@@ -1,4 +1,17 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# -*- encoding: utf-8 -*-
+"""
+@Project       : ML4Science Project
+@File          : cider.py
+@Author        : Yiyang Feng
+@Date          : 2022/12/20 18:33
+@Version       : 1.0
+"""
+
+"""
+define a class for computing cider score.
+"""
+
 
 from __future__ import absolute_import
 from __future__ import division
