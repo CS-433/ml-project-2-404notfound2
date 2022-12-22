@@ -1,5 +1,10 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
+
+
 """
 @Project       : ML4Science Project
 @File          : cider.py
@@ -13,9 +18,7 @@ define a class for computing cider score.
 """
 
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
 
 from cider.cider_scorer import CiderScorer
 

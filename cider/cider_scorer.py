@@ -1,3 +1,8 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
 """
@@ -13,9 +18,6 @@ compute cider score.
 """
 
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import copy
 import math

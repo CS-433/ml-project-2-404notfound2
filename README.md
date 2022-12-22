@@ -85,6 +85,9 @@ For prompt-learning models, run the notebook `copa_generation_prompt_learning.ip
 
 Result:
 
+- *Italics:* best fine-tuning performance
+- **Bold:** best performance
+
 |           | BERT<br>-base<br>-uncased | RoBERTa<br>-base | XLM<br>-RoBERTa<br>-base | BART<br>-base | GPT-3<br>-175B |
 | --------- | ----------------- | ------------ | --------------- | --------------- | --------------- |
 | BLEU-1 |        2.0%        |      26.7%      |         0        |   *31.2%*   |   **39.2%**   |
