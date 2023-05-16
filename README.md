@@ -1,4 +1,4 @@
-﻿# Fine-tuning and Prompt-learning on Commensense Causal Reasoning (CCR)
+﻿# Fine-tuning and Prompt-learning on Commonsense Causal Reasoning (CCR)
 
 The second [project](https://lia.epfl.ch/wp-content/uploads/project_proposals/proposal_498.pdf) of EPFL Machine learning course (CS-433). We choose the ML4Science option for the machine learning project.
 
